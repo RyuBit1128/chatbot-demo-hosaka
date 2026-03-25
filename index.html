@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>保坂歯科医院 AIアシスタント</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Noto Sans JP', sans-serif; background: #f0f4f8; height: 100vh; display: flex; flex-direction: column; }
+
+/* Header */
+.header { background: #fff; padding: 14px 16px; display: flex; align-items: center; gap: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); position: sticky; top: 0; z-index: 10; }
+.header-icon { width: 42px; height: 42px; background: linear-gradient(135deg, #0ea5e9, #0284c7); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 22px; }
+.header-name { font-size: 15px; font-weight: 700; color: #1e293b; }
+.header-sub { font-size: 11px; color: #94a3b8; }
+.header-status { margin-left: auto; display: flex; align-items: center; gap: 4px; font-size: 11px; color: #22c55e; background: #f0fdf4; padding: 4px 10px; border-radius: 20px; }
+.header-status-dot { width: 6px; height: 6px; background: #22c55e; border-radius: 50%; animation: pulse 2s infinite; }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+/* Chat */
+.chat { flex: 1; overflow-y: auto; padding: 16px; padding-bottom: 160px; }
+.msg { display: flex; margin-bottom: 12px; animation: fadeIn 0.3s ease; }
+.msg.user { justify-content: flex-end; }
+.msg.bot { justify-content: flex-start; }
+.bubble { max-width: 82%; padding: 12px 16px; font-size: 14px; line-height: 1.7; white-space: pre-line; word-break: break-word; }
+.msg.bot .bubble { background: #fff; color: #334155; border-radius: 4px 18px 18px 18px; box-shadow: 0 1px 2px rgba(0,0,0,0.06); }
+.msg.user .bubble { background: linear-gradient(135deg, #0ea5e9, #0284c7); color: #fff; border-radius: 18px 4px 18px 18px; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+/* Typing */
+.typing { display: flex; gap: 4px; padding: 12px 16px; }
+.typing span { width: 8px; height: 8px; background: #cbd5e1; border-radius: 50%; animation: bounce 1.4s infinite; }
+.typing span:nth-child(2) { animation-delay: 0.2s; }
+.typing span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes bounce { 0%, 80%, 100% { transform: translateY(0); } 40% { transform: translateY(-8px); } }
+
+/* Bottom */
+.bottom { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; border-top: 1px solid #e2e8f0; z-index: 10; }
+.quick { display: flex; gap: 8px; padding: 10px 16px 6px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.quick::-webkit-scrollbar { display: none; }
+.quick-btn { flex-shrink: 0; padding: 7px 14px; font-size: 13px; border: 1.5px solid #bae6fd; background: #f0f9ff; color: #0369a1; border-radius: 20px; cursor: pointer; transition: all 0.15s; }
+.quick-btn:active { background: #0ea5e9; color: #fff; border-color: #0ea5e9; }
+.input-row { display: flex; gap: 8px; padding: 8px 16px 12px; }
+.input-row input { flex: 1; border: 1.5px solid #e2e8f0; border-radius: 24px; padding: 10px 18px; font-size: 14px; outline: none; transition: border 0.2s; }
+.input-row input:focus { border-color: #0ea5e9; }
+.send-btn { width: 42px; height: 42px; border: none; background: linear-gradient(135deg, #0ea5e9, #0284c7); color: #fff; border-radius: 50%; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: opacity 0.2s; }
+.send-btn:disabled { background: #cbd5e1; cursor: default; }
+.branding { text-align: center; padding: 0 0 8px; font-size: 10px; color: #94a3b8; }
+.branding b { color: #64748b; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-icon">🦷</div>
+  <div>
+    <div class="header-name">保坂歯科医院</div>
+    <div class="header-sub">AIアシスタント</div>
+  </div>
+  <div class="header-status"><span class="header-status-dot"></span>オンライン</div>
+</div>
+
+<div class="chat" id="chat"></div>
+
+<div class="bottom">
+  <div class="quick" id="quick"></div>
+  <div class="input-row">
+    <input id="input" type="text" placeholder="ご質問を入力してください..." autocomplete="off">
+    <button class="send-btn" id="sendBtn" disabled>▶</button>
+  </div>
+  <div class="branding">Powered by <b>Fit AI</b></div>
+</div>
+
+<script>
+const INFO = {
+  name: "保坂歯科医院",
+  director: "保坂 浩之",
+  address: "〒400-0061 山梨県甲府市荒川1-8-12",
+  phone: "055-254-0418",
+  parking: "敷地内に専用駐車場11台分あり",
+  access: "はま寿司甲府荒川店の向かい側、COCO's甲府荒川店の隣。「荒川一丁目」バス停徒歩5分。",
+  hours: "月火水金 9:00〜12:30 / 14:30〜19:00\n木 9:00〜12:30（午後は訪問診療）\n土 9:00〜12:30 / 14:30〜17:00\n日祝 休診",
+  treatments: ["虫歯治療","歯周病治療","予防歯科","インプラント","ホワイトニング","入れ歯","審美歯科","矯正歯科（ワイヤー・インビザライン）","小児矯正","根管治療（マイクロスコープ使用）"],
+  ortho: {
+    pediatric: "495,000〜561,000円（税込）",
+    wireFull: "825,000〜891,000円（税込）",
+    wirePartial: "165,000〜330,000円（税込）",
+    invisFull: "880,000〜990,000円（税込）",
+    invisPartial: "385,000円（税込）"
+  }
+};
+
+const QUICK = ["診療時間は？","場所・駐車場","矯正の料金","どんな治療ができる？","予約したい"];
+
+function reply(m) {
+  const t = m.toLowerCase();
+  if (/診療時間|営業時間|何時|開いて|時間/.test(t))
+    return `📅 診療時間のご案内\n\n${INFO.hours}\n\n📞 お電話でもご確認いただけます\n${INFO.phone}`;
+  if (/場所|住所|アクセス|行き方|どこ|駐車|車|バス/.test(t))
+    return `📍 アクセス\n\n${INFO.address}\n\n🚗 ${INFO.parking}\n🚌 ${INFO.access}\n\n📞 ${INFO.phone}`;
+  if (/電話|tel|連絡|問い合わせ|予約/.test(t))
+    return `📞 ご予約・お問い合わせ\n\n${INFO.phone}\n\n受付時間内にお電話ください。`;
+  if (/矯正.*(料金|費用|値段|いくら)|料金.*矯正|インビザライン/.test(t))
+    return `💰 矯正治療の料金\n\n【小児矯正】\n${INFO.ortho.pediatric}\n\n【ワイヤー矯正】\n全顎：${INFO.ortho.wireFull}\n部分：${INFO.ortho.wirePartial}\n\n【インビザライン】\n全顎：${INFO.ortho.invisFull}\n部分：${INFO.ortho.invisPartial}\n\n矯正担当：桐井絢子先生（日本矯正歯科学会認定医）\n初回相談は約30分、お気軽にお電話ください📞\n${INFO.phone}`;
+  if (/矯正|歯並び|出っ歯|受け口|マウスピース/.test(t))
+    return `🦷 矯正歯科\n\n当院では以下の矯正に対応しています：\n\n・ワイヤー矯正：幅広い症例に対応\n・インビザライン：透明で目立たないマウスピース矯正\n・小児矯正：6〜12歳頃が対象\n\n担当：桐井絢子先生（日本矯正歯科学会認定医）\n\n「矯正の料金」と聞くと料金もお伝えできます😊`;
+  if (/インプラント/.test(t))
+    return `🦷 インプラント\n\nマイクロスコープを使用した精密な治療が特長です。\n治療前に丁寧なカウンセリングを行います。\n\n📞 ${INFO.phone}`;
+  if (/ホワイトニング|白く/.test(t))
+    return `✨ ホワイトニング\n\n当院ではホワイトニング治療を行っています。\n\n📞 詳しくはお電話でどうぞ\n${INFO.phone}`;
+  if (/虫歯|歯が痛|しみる/.test(t))
+    return `🦷 虫歯治療\n\n痛みがある場合は早めの受診をおすすめします。\n\n・マイクロスコープによる精密治療\n・できるだけ歯を残す方針\n・定期検診（3ヶ月ごと）で早期発見\n\n📞 ${INFO.phone}`;
+  if (/予防|定期検診|クリーニング/.test(t))
+    return `🛡️ 予防歯科\n\n3ヶ月ごとの定期検診をおすすめしています。\n\n口腔管理機能強化加算（口管強）認定施設です。\nフッ素塗布や歯周病メンテナンスが保険適用で毎月可能です。\n\n📞 ${INFO.phone}`;
+  if (/治療|メニュー|できる|対応/.test(t))
+    return `🏥 診療内容\n\n${INFO.treatments.map(t=>'・'+t).join('\n')}\n\n📞 ${INFO.phone}`;
+  if (/料金|費用|値段|いくら/.test(t))
+    return `💰 料金\n\n保険診療と自費診療がございます。\n\n【矯正料金（自費）】\n・小児：495,000円〜\n・ワイヤー：165,000円〜\n・インビザライン：385,000円〜\n\nその他は診察後にご説明します。\n📞 ${INFO.phone}`;
+  if (/院長|先生/.test(t))
+    return `👨‍⚕️ 院長紹介\n\n保坂 浩之\n昭和大学歯学部卒業。小児歯科から高齢者医療まで幅広く対応。\n\n矯正担当：桐井 絢子 先生\n日本矯正歯科学会認定医`;
+  if (/子供|こども|小児/.test(t))
+    return `👶 お子さまの治療\n\n・フッ素塗布（保険適用で毎月可能）\n・小児矯正（6〜12歳頃が対象）\n・院長は小児歯科の研修経験あり\n\n📞 ${INFO.phone}`;
+  if (/初めて|初診/.test(t))
+    return `🏥 初めての方へ\n\nお電話でご予約ください。\n📞 ${INFO.phone}\n\n治療前にCTや口腔内カメラで丁寧にご説明します。\n\n📍 ${INFO.address}\n🚗 駐車場11台完備`;
+  return `ご質問ありがとうございます😊\n\nお答えできる例：\n・診療時間\n・アクセス・駐車場\n・矯正の料金\n・治療内容\n・予約方法\n\nその他は📞 ${INFO.phone} でどうぞ。`;
+}
+
+const chat = document.getElementById('chat');
+const input = document.getElementById('input');
+const sendBtn = document.getElementById('sendBtn');
+const quickEl = document.getElementById('quick');
+
+function addMsg(text, isUser) {
+  const d = document.createElement('div');
+  d.className = 'msg ' + (isUser ? 'user' : 'bot');
+  d.innerHTML = '<div class="bubble">' + text.replace(/\n/g,'<br>') + '</div>';
+  chat.appendChild(d);
+  chat.scrollTop = chat.scrollHeight;
+}
+
+function showTyping() {
+  const d = document.createElement('div');
+  d.className = 'msg bot';
+  d.id = 'typing';
+  d.innerHTML = '<div class="bubble"><div class="typing"><span></span><span></span><span></span></div></div>';
+  chat.appendChild(d);
+  chat.scrollTop = chat.scrollHeight;
+}
+
+function hideTyping() {
+  const el = document.getElementById('typing');
+  if (el) el.remove();
+}
+
+function send(text) {
+  if (!text.trim()) return;
+  addMsg(text, true);
+  input.value = '';
+  sendBtn.disabled = true;
+  showTyping();
+  setTimeout(() => {
+    hideTyping();
+    addMsg(reply(text), false);
+  }, 500 + Math.random() * 700);
+}
+
+// Quick buttons
+QUICK.forEach(q => {
+  const b = document.createElement('button');
+  b.className = 'quick-btn';
+  b.textContent = q;
+  b.onclick = () => send(q);
+  quickEl.appendChild(b);
+});
+
+// Input
+input.addEventListener('input', () => { sendBtn.disabled = !input.value.trim(); });
+input.addEventListener('keydown', e => { if (e.key === 'Enter' && input.value.trim()) send(input.value); });
+sendBtn.addEventListener('click', () => { if (input.value.trim()) send(input.value); });
+
+// Welcome
+addMsg("こんにちは！\n保坂歯科医院のAIアシスタントです😊\n\nご質問があればお気軽にどうぞ！\n下のボタンからも質問できます👇", false);
+</script>
+</body>
+</html>
