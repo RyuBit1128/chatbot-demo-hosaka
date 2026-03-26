@@ -2,7 +2,6 @@
 
 import { useState, useRef, useEffect } from "react";
 import { ChatConfig, Message } from "../types";
-import { generateReply } from "../engine/chat-engine";
 import MessageBubble from "./MessageBubble";
 import TypingIndicator from "./TypingIndicator";
 import QuickQuestions from "./QuickQuestions";
@@ -25,18 +24,43 @@ export default function ChatWidget({ config }: Props) {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const sendMessage = (text: string) => {
+  const sendMessage = async (text: string) => {
     if (!text.trim()) return;
     const userMsg: Message = { role: "user", content: text.trim() };
-    setMessages((prev) => [...prev, userMsg]);
+    const newMessages = [...messages, userMsg];
+    setMessages(newMessages);
     setIsTyping(true);
 
-    setTimeout(() => {
-      const reply = generateReply(text.trim(), config);
-      setMessages((prev) => [...prev, { role: "assistant", content: reply }]);
+    try {
+      // API Routeに送信（systemメッセージを除く会話履歴）
+      const chatMessages = newMessages
+        .map((m) => ({ role: m.role, content: m.content }));
+
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: chatMessages }),
+      });
+
+      if (!res.ok) throw new Error("API error");
+
+      const data = await res.json();
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: data.reply },
+      ]);
+    } catch {
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: `申し訳ございません、一時的にエラーが発生しました。\n\nお電話でもお問い合わせいただけます。\n📞 ${config.business.phone}`,
+        },
+      ]);
+    } finally {
       setIsTyping(false);
       if (!isOpen) setUnread((u) => u + 1);
-    }, 600 + Math.random() * 800);
+    }
   };
 
   const toggleOpen = () => {
@@ -60,7 +84,7 @@ export default function ChatWidget({ config }: Props) {
               </h2>
               <p className="text-sky-100 text-xs flex items-center gap-1">
                 <span className="w-1.5 h-1.5 bg-green-300 rounded-full" />
-                AIアシスタント
+                AI対応中
               </p>
             </div>
             <button

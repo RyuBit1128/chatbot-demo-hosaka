@@ -1,6 +1,5 @@
 import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
-  output: "export",
-  basePath: "/chatbot-demo-hosaka",
+  // Vercel用: output: "export" を外してサーバーサイドAPI Routeを有効化
 };
 export default nextConfig;
